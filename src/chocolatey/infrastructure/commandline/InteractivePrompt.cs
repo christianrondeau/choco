@@ -39,7 +39,7 @@ namespace chocolatey.infrastructure.commandline
             get { return _console.Value; }
         }
 
-        public static string prompt_for_confirmation(string prompt, IEnumerable<string> choices, string defaultChoice, bool requireAnswer, int repeat = 10)
+        public static string prompt_for_confirmation(string prompt, IEnumerable<string> choices, bool requireAnswer, int repeat = 10)
         {
             if (repeat < 0) throw new ApplicationException("Too many bad attempts. Stopping before application crash.");
             Ensure.that(() => prompt).is_not_null();
@@ -49,14 +49,6 @@ namespace chocolatey.infrastructure.commandline
                 .meets(
                     c => c.Count() > 0,
                     (name, value) => { throw new ApplicationException("No choices passed in. Please ensure you pass choices"); });
-            if (defaultChoice != null)
-            {
-                Ensure
-                    .that(() => choices)
-                    .meets(
-                        c => c.Contains(defaultChoice),
-                        (name, value) => { throw new ApplicationException("Default choice value must be one of the given choices."); });
-            }
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, prompt);
 
@@ -65,16 +57,11 @@ namespace chocolatey.infrastructure.commandline
             foreach (var choice in choices.or_empty_list_if_null())
             {
                 choiceDictionary.Add(counter, choice);
-                "chocolatey".Log().Info(" {0}) {1}{2}".format_with(counter, choice.to_string(), choice == defaultChoice ? " [Default - Press Enter]" : ""));
+                "chocolatey".Log().Info(" {0}) {1}".format_with(counter, choice.to_string()));
                 counter++;
             }
 
             var selection = Console.ReadLine();
-
-            if (string.IsNullOrWhiteSpace(selection) && defaultChoice != null)
-            {
-                return defaultChoice;
-            }
 
             int selected = -1;
 
@@ -98,7 +85,7 @@ namespace chocolatey.infrastructure.commandline
                     if (requireAnswer)
                     {
                         "chocolatey".Log().Warn(ChocolateyLoggers.Important, "You must select an answer");
-                        return prompt_for_confirmation(prompt, choices, defaultChoice, requireAnswer, repeat - 1);
+                        return prompt_for_confirmation(prompt, choices, requireAnswer, repeat - 1);
                     }
                     return null;
                 }
