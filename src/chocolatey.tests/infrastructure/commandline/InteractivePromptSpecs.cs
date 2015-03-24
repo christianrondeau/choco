@@ -46,15 +46,13 @@ namespace chocolatey.tests.infrastructure.commandline
             }
         }
 
-        public class when_prompting_with_interactivePrompt : InteractivePromptSpecsBase
+        public class when_prompting_with_interactivePrompt_with_errors : InteractivePromptSpecsBase
         {
-            private string default_choice;
             private Func<string> prompt;
 
             public override void Because()
             {
-                console.Setup(c => c.ReadLine()).Returns(""); //Enter pressed
-                prompt = () => InteractivePrompt.prompt_for_confirmation(prompt_value, choices, requireAnswer: false);
+                prompt = () => InteractivePrompt.prompt_for_confirmation(prompt_value, choices);
             }
 
             [Fact]
@@ -119,101 +117,13 @@ namespace chocolatey.tests.infrastructure.commandline
             }
         }
 
-        public class when_prompting_with_interactivePrompt_and_answer_is_not_required : InteractivePromptSpecsBase
+        public class when_prompting_with_interactivePrompt : InteractivePromptSpecsBase
         {
             private Func<string> prompt;
 
             public override void Because()
             {
-                prompt = () => InteractivePrompt.prompt_for_confirmation(prompt_value, choices, requireAnswer: false);
-            }
-
-            public override void AfterObservations()
-            {
-                base.AfterObservations();
-                should_have_called_Console_ReadLine();
-            }
-
-            [Fact]
-            public void should_return_null_when_no_answer_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns(""); //Enter pressed
-                var result = prompt();
-                result.ShouldBeNull();
-            }
-
-            [Fact]
-            public void should_return_first_choice_when_1_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("1");
-                var result = prompt();
-                result.ShouldEqual(choices[0]);
-            } 
-            
-            [Fact]
-            public void should_return_first_choice_when_value_of_choice_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("yes");
-                var result = prompt();
-                result.ShouldEqual(choices[0]);
-            }
-
-            [Fact]
-            public void should_return_second_choice_when_2_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("2");
-                var result = prompt();
-                result.ShouldEqual(choices[1]);
-            }
-
-            [Fact]
-            public void should_return_null_choice_when_3_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("3");
-                var result = prompt();
-                result.ShouldBeNull();
-            }
-
-            [Fact]
-            public void should_return_null_choice_when_4_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("4");
-                var result = prompt();
-                result.ShouldBeNull();
-            }
-
-            [Fact]
-            public void should_return_null_choice_when_0_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("0");
-                var result = prompt();
-                result.ShouldBeNull();
-            }
-
-            [Fact]
-            public void should_return_null_choice_when_negative_1_is_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("-1");
-                var result = prompt();
-                result.ShouldBeNull();
-            }
-
-            [Fact]
-            public void should_return_null_choice_when_alphabetical_characters_are_given()
-            {
-                console.Setup(c => c.ReadLine()).Returns("abc");
-                var result = prompt();
-                result.ShouldBeNull();
-            }
-        }
-
-        public class when_prompting_with_interactivePrompt_and_answer_is_required : InteractivePromptSpecsBase
-        {
-            private Func<string> prompt;
-
-            public override void Because()
-            {
-                prompt = () => InteractivePrompt.prompt_for_confirmation(prompt_value, choices, requireAnswer: true);
+                prompt = () => InteractivePrompt.prompt_for_confirmation(prompt_value, choices);
             }
 
             public override void AfterObservations()

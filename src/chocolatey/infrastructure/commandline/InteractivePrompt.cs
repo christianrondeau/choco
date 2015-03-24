@@ -39,7 +39,7 @@ namespace chocolatey.infrastructure.commandline
             get { return _console.Value; }
         }
 
-        public static string prompt_for_confirmation(string prompt, IEnumerable<string> choices, bool requireAnswer, int repeat = 10)
+        public static string prompt_for_confirmation(string prompt, IEnumerable<string> choices, int repeat = 10)
         {
             if (repeat < 0) throw new ApplicationException("Too many bad attempts. Stopping before application crash.");
             Ensure.that(() => prompt).is_not_null();
@@ -82,12 +82,8 @@ namespace chocolatey.infrastructure.commandline
                 if (!selectionFound)
                 {
                     "chocolatey".Log().Error(ChocolateyLoggers.Important, "Your choice of '{0}' is not a valid selection.".format_with(selection));
-                    if (requireAnswer)
-                    {
-                        "chocolatey".Log().Warn(ChocolateyLoggers.Important, "You must select an answer");
-                        return prompt_for_confirmation(prompt, choices, requireAnswer, repeat - 1);
-                    }
-                    return null;
+                    "chocolatey".Log().Warn(ChocolateyLoggers.Important, "You must select an answer");
+                    return prompt_for_confirmation(prompt, choices, repeat - 1);
                 }
             }
 
