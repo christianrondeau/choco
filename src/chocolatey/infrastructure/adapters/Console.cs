@@ -19,6 +19,11 @@ namespace chocolatey.infrastructure.adapters
 
     public sealed class Console : IConsole
     {
+        public void Write(string value)
+        {
+            System.Console.Write(value);
+        }
+
         public string ReadLine()
         {
             return System.Console.ReadLine();

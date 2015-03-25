@@ -22,6 +22,12 @@ namespace chocolatey.infrastructure.adapters
     public interface IConsole
     {
         /// <summary>
+        /// Writes the specified string value to the standard output stream.
+        /// </summary>
+        /// <param name="value">The value to write. </param><exception cref="T:System.IO.IOException">An I/O error occurred. </exception><filterpriority>1</filterpriority>
+        void Write(string value);
+
+        /// <summary>
         ///   Reads the next line of characters from the standard input stream.
         /// </summary>
         /// <returns>

@@ -55,9 +55,12 @@ namespace chocolatey.infrastructure.commandline
                     c => c.Select(entry => entry.FirstOrDefault()).Distinct().Count() == c.Count(),
                     (name, value) => { throw new ApplicationException("Multiple choices have the same first letter. Please ensure you pass choices with different first letters."); });
 
-            "chocolatey".Log().Info(ChocolateyLoggers.Important, "{0} ({1}): ".format_with(prompt, String.Join("/", choices)));
-
+            var promptWithChoices = "{0} ({1}): ".format_with(prompt, String.Join("/", choices));
+            
+            Console.Write(promptWithChoices);
             var selection = Console.ReadLine();
+
+            "chocolatey".Log().Info(ChocolateyLoggers.LogFileOnly, "{0}{1}".format_with(promptWithChoices, selection));
 
             // check to see if value was passed
             foreach (var choice in choices)
