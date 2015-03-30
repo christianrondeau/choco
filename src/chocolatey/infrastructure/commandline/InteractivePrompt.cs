@@ -52,6 +52,11 @@ namespace chocolatey.infrastructure.commandline
             Ensure
                 .that(() => choices)
                 .meets(
+                    c => !c.Any(String.IsNullOrWhiteSpace),
+                    (name, value) => { throw new ApplicationException("Some choices are empty. Please ensure you provide no empty choices."); });
+            Ensure
+                .that(() => choices)
+                .meets(
                     c => c.Select(entry => entry.FirstOrDefault()).Distinct().Count() == c.Count(),
                     (name, value) => { throw new ApplicationException("Multiple choices have the same first letter. Please ensure you pass choices with different first letters."); });
 
@@ -65,7 +70,7 @@ namespace chocolatey.infrastructure.commandline
             // check to see if value was passed
             foreach (var choice in choices)
             {
-                if (choice.is_equal_to(selection) || choice.FirstOrDefault().ToString().is_equal_to(selection))
+                if (choice.is_equal_to(selection) || choice.Substring(0, 1).is_equal_to(selection))
                 {
                     selection = choice;
                     return selection;

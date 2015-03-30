@@ -495,17 +495,42 @@ namespace chocolatey.tests.infrastructure.commandline
                 choices = new List<string> { "bob" };
                 prompt_value = null;
                 bool errored = false;
+                string errorMessage = string.Empty;
                 console.Setup(c => c.ReadLine()).Returns(""); //Enter pressed
                 try
                 {
                     prompt();
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     errored = true;
+                    errorMessage = ex.Message;
                 }
 
                 errored.ShouldBeTrue();
+                errorMessage.ShouldContain("Value for prompt cannot be null.");
+                console.Verify(c => c.ReadLine(), Times.Never);
+            }
+
+            [Fact]
+            public void should_error_when_the_choicelist_contains_empty_values()
+            {
+                choices = new List<string> { "bob", "" };
+                bool errored = false;
+                string errorMessage = string.Empty;
+                console.Setup(c => c.ReadLine()).Returns(""); //Enter pressed
+                try
+                {
+                    prompt();
+                }
+                catch (Exception ex)
+                {
+                    errored = true;
+                    errorMessage = ex.Message;
+                }
+
+                errored.ShouldBeTrue();
+                errorMessage.ShouldContain("Some choices are empty.");
                 console.Verify(c => c.ReadLine(), Times.Never);
             }
 
@@ -527,7 +552,7 @@ namespace chocolatey.tests.infrastructure.commandline
                 }
 
                 errored.ShouldBeTrue();
-                errorMessage.ShouldContain("Multiple choices have the same first letter. Please ensure you pass choices with different first letters.");
+                errorMessage.ShouldContain("Multiple choices have the same first letter.");
                 console.Verify(c => c.ReadLine(), Times.Never);
             }
         }
