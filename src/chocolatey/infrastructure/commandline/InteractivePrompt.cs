@@ -111,6 +111,7 @@ namespace chocolatey.infrastructure.commandline
                 counter++;
             }
 
+            Console.Write("> ");
             var selection = Console.ReadLine();
 
             if (string.IsNullOrWhiteSpace(selection) && defaultChoice != null)
