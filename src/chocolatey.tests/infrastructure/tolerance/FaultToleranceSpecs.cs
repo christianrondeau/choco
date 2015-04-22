@@ -72,7 +72,41 @@ namespace chocolatey.tests.infrastructure.tolerance
                     // don't care
                 }
 
-                MockLogger.MessagesFor(LogLevel.Warn).Count.ShouldEqual(2);
+                MockLogger.MessagesFor(LogLevel.Warn).Count.ShouldEqual(3);
+            }
+
+            [Fact]
+            public void should_log_error_once()
+            {
+                reset();
+
+                try
+                {
+                    FaultTolerance.retry(3, () => { throw new Exception("YIKES"); }, waitDurationMilliseconds: 0);
+                }
+                catch
+                {
+                    // don't care
+                }
+
+                MockLogger.MessagesFor(LogLevel.Error).ShouldContain("Chocolatey could not execute the operation.");
+            }
+
+            [Fact]
+            public void should_log_error_once_with_description()
+            {
+                reset();
+
+                try
+                {
+                    FaultTolerance.retry(3, () => { throw new Exception("YIKES"); }, description: "Throwing YYKES", waitDurationMilliseconds: 0);
+                }
+                catch
+                {
+                    // don't care
+                }
+
+                MockLogger.MessagesFor(LogLevel.Error).ShouldContain("Chocolatey could not execute: Throwing YYKES");
             }
 
             [Fact]

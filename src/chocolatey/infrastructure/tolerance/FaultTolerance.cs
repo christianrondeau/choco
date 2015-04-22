@@ -44,9 +44,10 @@ namespace chocolatey.infrastructure.tolerance
         /// </summary>
         /// <param name="numberOfTries">The number of tries.</param>
         /// <param name="action">The action.</param>
+        /// <param name="description">A message describing what the <paramref name="action"/> is. Shown when an error occurs.</param>
         /// <param name="waitDurationMilliseconds">The wait duration in milliseconds.</param>
         /// <param name="increaseRetryByMilliseconds">The time for each try to increase the wait duration by in milliseconds.</param>
-        public static void retry(int numberOfTries, Action action, int waitDurationMilliseconds = 100, int increaseRetryByMilliseconds = 0)
+        public static void retry(int numberOfTries, Action action, string description = null, int waitDurationMilliseconds = 100, int increaseRetryByMilliseconds = 0)
         {
             if (action == null) return;
 
@@ -57,6 +58,7 @@ namespace chocolatey.infrastructure.tolerance
                         action.Invoke();
                         return true;
                     },
+                description,
                 waitDurationMilliseconds,
                 increaseRetryByMilliseconds);
         }
@@ -67,11 +69,12 @@ namespace chocolatey.infrastructure.tolerance
         /// <typeparam name="T">The type of the return value from the function.</typeparam>
         /// <param name="numberOfTries">The number of tries.</param>
         /// <param name="function">The function.</param>
+        /// <param name="description">A message describing what the <paramref name="function"/> is. Shown when an error occurs.</param>
         /// <param name="waitDurationMilliseconds">The wait duration in milliseconds.</param>
         /// <param name="increaseRetryByMilliseconds">The time for each try to increase the wait duration by in milliseconds.</param>
         /// <returns>The return value from the function</returns>
         /// <exception cref="System.ApplicationException">You must specify a number of retries greater than zero.</exception>
-        public static T retry<T>(int numberOfTries, Func<T> function, int waitDurationMilliseconds = 100, int increaseRetryByMilliseconds = 0)
+        public static T retry<T>(int numberOfTries, Func<T> function, string description = null, int waitDurationMilliseconds = 100, int increaseRetryByMilliseconds = 0)
         {
             if (function == null) return default(T);
             if (numberOfTries == 0) throw new ApplicationException("You must specify a number of retries greater than zero.");
@@ -88,22 +91,23 @@ namespace chocolatey.infrastructure.tolerance
                 }
                 catch (Exception ex)
                 {
-                    if (i == numberOfTries)
-                    {
-                        "chocolatey".Log().Error("Maximum tries of {0} reached. Throwing error.".format_with(numberOfTries));
-                        throw;
-                    }
-                    
-                    int retryWait = waitDurationMilliseconds + (i*increaseRetryByMilliseconds);
-
                     var exceptionMessage = debugging ? ex.ToString() : ex.Message;
 
-                    "chocolatey".Log().Warn("This is try {3}/{4}. Retrying after {2} milliseconds.{0} Error converted to warning:{0} {1}".format_with(
-                        Environment.NewLine,
-                        exceptionMessage,
-                        retryWait,
-                        i, 
-                        numberOfTries));
+                    var failedMessage = "Operation failed ({0}/{1}): {2}".format_with(i, numberOfTries, exceptionMessage);
+                    "chocolatey".Log().Warn(failedMessage);
+                    
+                    if (i == numberOfTries)
+                    {
+                        "chocolatey".Log().Error(description != null
+                            ? "Chocolatey could not execute: {0}".format_with(description)
+                            : "Chocolatey could not execute the operation.");
+
+                        throw;
+                    }
+
+                    int retryWait = waitDurationMilliseconds + (i * increaseRetryByMilliseconds);
+
+                    "chocolatey".Log().Info("Retrying after {0} milliseconds...".format_with(retryWait));
                     Thread.Sleep(retryWait);
                 }
             }
