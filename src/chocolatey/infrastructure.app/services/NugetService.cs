@@ -1045,12 +1045,24 @@ spam/junk folder.");
                 config.Input = string.Empty;
 
                 var localPackages = list_run(config, logResults: false);
+                var packagesToUpdate = localPackages.Select((p) => p.Key);
+
+                if (!String.IsNullOrEmpty(config.UpgradeCommand.PackageNamesToSkip))
+                {
+                    var packagesToSkip = config.UpgradeCommand.PackageNamesToSkip
+                        .Split(',')
+                        .Select(x => x.Trim())
+                        .Where(x => !String.IsNullOrEmpty(x));
+
+                    packagesToUpdate = packagesToUpdate.Where(x => !packagesToSkip.Contains(x, StringComparer.OrdinalIgnoreCase));
+                }
 
                 config.Input = input;
                 config.Noop = noop;
                 config.Prerelease = pre;
                 config.Sources = sources;
-                config.PackageNames = string.Join(ApplicationParameters.PackageNamesSeparator, localPackages.Select((p) => p.Key).or_empty_list_if_null());
+
+                config.PackageNames = string.Join(ApplicationParameters.PackageNamesSeparator, packagesToUpdate);
 
                 if (customAction != null) customAction.Invoke();
             }
