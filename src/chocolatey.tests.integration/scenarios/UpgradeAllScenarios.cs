@@ -78,5 +78,28 @@ namespace chocolatey.tests.integration.scenarios
                 installPackageResult.First().Value.Version.ShouldEqual("1.0.0");
             }
         }
+
+        [Concern(typeof(ChocolateyUpgradeCommand))]
+        public class when_upgrading_all_packages_with_except : ScenariosBase
+        {
+            public override void Because()
+            {
+                Configuration.UpgradeCommand.PackageNamesToSkip = "upgradepackage";
+                Results = Service.upgrade_run(Configuration);
+            }
+
+            [Fact]
+            public void should_report_for_all_non_skipped_packages()
+            {
+                Results.Count().ShouldEqual(1);
+            }
+
+            [Fact]
+            public void should_skip_packages_in_except_list()
+            {
+                var upgradePackageResult = Results.Where(x => x.Key == "upgradepackage").ToList();
+                upgradePackageResult.Count.ShouldEqual(0, "upgradepackage should not be in the results list");
+            }
+        }
     }
 }
