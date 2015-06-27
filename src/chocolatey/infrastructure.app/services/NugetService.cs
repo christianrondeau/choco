@@ -1045,16 +1045,37 @@ spam/junk folder.");
                 config.Input = string.Empty;
 
                 var localPackages = list_run(config, logResults: false);
-                var packagesToUpdate = localPackages.Select((p) => p.Key);
+                var packagesToUpdate = localPackages.Select(p => p.Key).ToList();
 
                 if (!String.IsNullOrEmpty(config.UpgradeCommand.PackageNamesToSkip))
                 {
                     var packagesToSkip = config.UpgradeCommand.PackageNamesToSkip
                         .Split(',')
                         .Select(x => x.Trim())
-                        .Where(x => !String.IsNullOrEmpty(x));
+                        .Where(x => !String.IsNullOrEmpty(x))
+                        .ToList();
 
-                    packagesToUpdate = packagesToUpdate.Where(x => !packagesToSkip.Contains(x, StringComparer.OrdinalIgnoreCase));
+                    var unknownPackagesToSkip = packagesToSkip
+                        .Where(x => !packagesToUpdate.Contains(x, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (unknownPackagesToSkip.Any())
+                    {
+                        this.Log().Warn(() => "Some packages specified in '-except' were not found in the local packages: '{0}'".format_with(String.Join(",", unknownPackagesToSkip)));
+
+                        packagesToSkip = packagesToSkip
+                            .Where(x => !unknownPackagesToSkip.Contains(x))
+                            .ToList();
+                    }
+
+                    if (packagesToSkip.Any())
+                    {
+                        packagesToUpdate = packagesToUpdate
+                            .Where(x => !packagesToSkip.Contains(x, StringComparer.OrdinalIgnoreCase))
+                            .ToList();
+
+                        this.Log().Info("These packages will not be upgraded because they were specified in '-except': {0}".format_with(String.Join(",", packagesToSkip)));
+                    }
                 }
 
                 config.Input = input;
