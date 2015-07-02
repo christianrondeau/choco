@@ -4,6 +4,7 @@
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Text.RegularExpressions;
     using Microsoft.Win32;
     using configuration;
@@ -173,12 +174,13 @@
                     RegularOutput = config.RegularOutput,
                     PromptForConfirmation = false,
                     AcceptLicense = true,
+                    QuietOutput = true,
                 };
                 runnerConfig.ListCommand.LocalOnly = true;
 
-                var localPackages = _nugetService.list_run(runnerConfig, logResults: false);
+                var localPackages = _nugetService.list_run(runnerConfig);
 
-                if (!localPackages.ContainsKey(PYTHON_PACKAGE))
+                if (!localPackages.Any(p => p.Name.is_equal_to(PYTHON_PACKAGE)))
                 {
                     runnerConfig.PackageNames = PYTHON_PACKAGE;
                     runnerConfig.Sources = ApplicationParameters.ChocolateyCommunityFeedSource;
@@ -269,11 +271,11 @@
             this.Log().Info("Would have run '{0} {1}'".format_with(_exePath, args));
         }
 
-        public ConcurrentDictionary<string, PackageResult> list_run(ChocolateyConfiguration config, bool logResults)
+        public IEnumerable<PackageResult> list_run(ChocolateyConfiguration config)
         {
             set_executable_path_if_not_set();
             var args = build_args(config, _listArguments);
-            var packageResults = new ConcurrentDictionary<string, PackageResult>(StringComparer.InvariantCultureIgnoreCase);
+            var packageResults = new List<PackageResult>();
 
             Environment.ExitCode = _commandExecutor.execute(
                 _exePath,
@@ -284,7 +286,7 @@
                     {
                         var logMessage = e.Data;
                         if (string.IsNullOrWhiteSpace(logMessage)) return;
-                        if (logResults)
+                        if (!config.QuietOutput)
                         {
                             this.Log().Info(e.Data);
                         }

@@ -199,14 +199,6 @@ namespace chocolatey.tests.infrastructure.app.commands
                 because();
                 configuration.Sources.ShouldEqual(source);
             }
-
-            [Fact]
-            public void should_set_source_to_local_location_when_localonly_is_true()
-            {
-                configuration.ListCommand.LocalOnly = true;
-                because();
-                configuration.Sources.ShouldEqual(ApplicationParameters.PackagesLocation);
-            }
         }
 
         public class when_noop_is_called : ChocolateyListCommandSpecsBase
@@ -233,7 +225,7 @@ namespace chocolatey.tests.infrastructure.app.commands
             [Fact]
             public void should_call_service_list_run()
             {
-                packageService.Verify(c => c.list_run(configuration, true), Times.Once);
+                packageService.Verify(c => c.list_run(configuration), Times.Once);
             }
         }
     }
