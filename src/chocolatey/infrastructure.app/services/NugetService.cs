@@ -1047,12 +1047,12 @@ spam/junk folder.");
                 var localPackages = list_run(config, logResults: false);
                 var packagesToUpdate = localPackages.Select(p => p.Key).ToList();
 
-                if (!String.IsNullOrEmpty(config.UpgradeCommand.PackageNamesToSkip))
+                if (!String.IsNullOrWhiteSpace(config.UpgradeCommand.PackageNamesToSkip))
                 {
                     var packagesToSkip = config.UpgradeCommand.PackageNamesToSkip
                         .Split(',')
-                        .Select(x => x.Trim())
-                        .Where(x => !String.IsNullOrEmpty(x))
+                        .Where(x => !String.IsNullOrWhiteSpace(x))
+                        .Select(x => x.trim_safe())
                         .ToList();
 
                     var unknownPackagesToSkip = packagesToSkip
@@ -1061,7 +1061,7 @@ spam/junk folder.");
 
                     if (unknownPackagesToSkip.Any())
                     {
-                        this.Log().Warn(() => "Some packages specified in '-except' were not found in the local packages: '{0}'".format_with(String.Join(",", unknownPackagesToSkip)));
+                        this.Log().Warn(() => "Some packages specified in the 'except' list were not found in the local packages: '{0}'".format_with(String.Join(",", unknownPackagesToSkip)));
 
                         packagesToSkip = packagesToSkip
                             .Where(x => !unknownPackagesToSkip.Contains(x))
@@ -1074,7 +1074,7 @@ spam/junk folder.");
                             .Where(x => !packagesToSkip.Contains(x, StringComparer.OrdinalIgnoreCase))
                             .ToList();
 
-                        this.Log().Info("These packages will not be upgraded because they were specified in '-except': {0}".format_with(String.Join(",", packagesToSkip)));
+                        this.Log().Info("These packages will not be upgraded because they were specified in the 'except' list: {0}".format_with(String.Join(",", packagesToSkip)));
                     }
                 }
 
