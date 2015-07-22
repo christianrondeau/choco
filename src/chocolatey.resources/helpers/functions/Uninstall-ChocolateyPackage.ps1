@@ -47,7 +47,7 @@ Uninstall-ChocolateyPackage
 #>
 param(
   [string] $packageName, 
-  [string] $fileType = 'exe',
+  [alias("installerType")][string] $fileType = 'exe',
   [string] $silentArgs = '',
   [string] $file,
   $validExitCodes = @(0)
@@ -75,8 +75,8 @@ param(
   }
   if ($fileType -like 'exe') {
     if ($overrideArguments) {
+      Write-Host "Overriding package arguments with `'$additionalInstallArgs`'";
       Start-ChocolateyProcessAsAdmin "$additionalInstallArgs" $file -validExitCodes $validExitCodes
-      write-host "Overriding package arguments with `'$additionalInstallArgs`'";
     } else {
       Start-ChocolateyProcessAsAdmin "$silentArgs $additionalInstallArgs" $file -validExitCodes $validExitCodes
     }

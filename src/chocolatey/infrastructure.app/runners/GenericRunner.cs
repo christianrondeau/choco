@@ -22,7 +22,9 @@ namespace chocolatey.infrastructure.app.runners
     using SimpleInjector;
     using adapters;
     using attributes;
+    using commandline;
     using configuration;
+    using domain;
     using infrastructure.commands;
     using logging;
     using Console = System.Console;
@@ -51,10 +53,17 @@ namespace chocolatey.infrastructure.app.runners
             }
             else
             {
+                if (command.may_require_admin_access())
+                {
+                    warn_when_admin_needs_elevation(config);
+                }
+
                 if (parseArgs != null)
                 {
                     parseArgs.Invoke(command);
                 }
+
+                set_source_type(config);
 
                 this.Log().Debug(() => "Configuration: {0}".format_with(config.ToString()));
 
@@ -104,6 +113,15 @@ Chocolatey is not an official build (bypassed with --allow-unofficial).
             return command;
         }
 
+        private void set_source_type(ChocolateyConfiguration config)
+        {
+            var sourceType = SourceType.normal;
+            Enum.TryParse(config.Sources, true, out sourceType);
+            config.SourceType = sourceType;
+
+            this.Log().Debug(()=> "The source '{0}' evaluated to a '{1}' source type".format_with(config.Sources,sourceType.to_string()));
+        }
+
         public void run(ChocolateyConfiguration config, Container container, bool isConsole, Action<ICommand> parseArgs)
         {
             var command = find_command(config, container, isConsole, parseArgs);
@@ -131,5 +149,30 @@ Chocolatey is not an official build (bypassed with --allow-unofficial).
                 return command.list(config);
             }
         }
+
+        public void warn_when_admin_needs_elevation(ChocolateyConfiguration config)
+        {
+            // NOTE: blended options may not have been fully initialized yet
+            if (!config.PromptForConfirmation) return;
+
+            if (!config.Information.IsProcessElevated && config.Information.IsUserAdministrator)
+            {
+                var selection = InteractivePrompt.prompt_for_confirmation(@"
+Chocolatey detected you are not running from an elevated command shell
+ (cmd/powershell). You may experience errors - many functions/packages
+ require admin rights. Only advanced users should run choco w/out an
+ elevated shell. When you open the command shell, you should ensure 
+ that you do so with ""Run as Administrator"" selected.
+
+ Do you want to continue?", new[] { "yes", "no" }, defaultChoice: null, requireAnswer: true);
+
+                if (selection.is_equal_to("no"))
+                {
+                    Environment.Exit(-1);
+                }
+            }
+        }
+
     }
 }
+

@@ -17,14 +17,19 @@ namespace chocolatey.infrastructure.filesystem
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading;
+    using adapters;
+    using app;
     using platforms;
     using tolerance;
+    using Assembly = adapters.Assembly;
+    using Environment = adapters.Environment;
 
     /// <summary>
     ///   Implementation of IFileSystem for Dot Net
@@ -33,14 +38,26 @@ namespace chocolatey.infrastructure.filesystem
     public sealed class DotNetFileSystem : IFileSystem
     {
         private readonly int TIMES_TO_TRY_OPERATION = 3;
+        private static Lazy<IEnvironment> environment_initializer = new Lazy<IEnvironment>(() => new Environment());
 
         private void allow_retries(Action action)
         {
             FaultTolerance.retry(
-               TIMES_TO_TRY_OPERATION,
-               action,
-               waitDurationMilliseconds: 200,
-               increaseRetryByMilliseconds: 100);
+                TIMES_TO_TRY_OPERATION,
+                action,
+                waitDurationMilliseconds: 200,
+                increaseRetryByMilliseconds: 100);
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public void initialize_with(Lazy<IEnvironment> environment)
+        {
+            environment_initializer = environment;
+        }
+        
+        private static IEnvironment Environment
+        {
+            get { return environment_initializer.Value; }
         }
 
         #region Path
@@ -50,6 +67,8 @@ namespace chocolatey.infrastructure.filesystem
             var combinedPath = Platform.get_platform() == PlatformType.Windows ? leftItem : leftItem.Replace('\\', '/');
             foreach (var rightItem in rightItems)
             {
+                if (rightItem.Contains(":")) throw new ApplicationException("Cannot combine a path with ':' attempted to combine '{0}' with '{1}'".format_with(rightItem, combinedPath));
+ 
                 var rightSide = Platform.get_platform() == PlatformType.Windows ? rightItem : rightItem.Replace('\\', '/');
                 if (rightSide.StartsWith(Path.DirectorySeparatorChar.to_string()) || rightSide.StartsWith(Path.AltDirectorySeparatorChar.to_string()))
                 {
@@ -66,6 +85,8 @@ namespace chocolatey.infrastructure.filesystem
 
         public string get_full_path(string path)
         {
+            if (string.IsNullOrWhiteSpace(path)) return path;
+
             return Path.GetFullPath(path);
         }
 
@@ -79,6 +100,57 @@ namespace chocolatey.infrastructure.filesystem
             return Path.DirectorySeparatorChar;
         }
 
+        public char get_path_separator()
+        {
+            return Path.PathSeparator;
+        }
+
+        public string get_executable_path(string executableName)
+        {
+            if (string.IsNullOrWhiteSpace(executableName)) return string.Empty;
+
+            var isWindows = Platform.get_platform() == PlatformType.Windows;
+            IList<string> extensions = new List<string>();
+
+            if (get_file_name_without_extension(executableName).is_equal_to(executableName) && isWindows)
+            {
+                var pathExtensions = Environment.GetEnvironmentVariable(ApplicationParameters.Environment.PathExtensions).to_string().Split(new[] {ApplicationParameters.Environment.PathExtensionsSeparator}, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var extension in pathExtensions.or_empty_list_if_null())
+                {
+                    extensions.Add(extension.StartsWith(".") ? extension : ".{0}".format_with(extension));
+                }
+            }
+
+            // Always add empty, for when the executable name is enough.
+            extensions.Add(string.Empty);
+
+            // Gets the path to an executable based on looking in current 
+            // working directory, next to the running process, then among the
+            // derivatives of Path and Pathext variables, applied in order.
+            var searchPaths = new List<string>();
+            searchPaths.Add(get_current_directory());
+            searchPaths.Add(get_directory_name(get_current_assembly_path()));
+            searchPaths.AddRange(Environment.GetEnvironmentVariable(ApplicationParameters.Environment.Path).to_string().Split(new[] { get_path_separator() }, StringSplitOptions.RemoveEmptyEntries));
+
+            foreach (var path in searchPaths.or_empty_list_if_null())
+            {
+                foreach (var extension in extensions.or_empty_list_if_null())
+                {
+                    var possiblePath = combine_paths(path, "{0}{1}".format_with(executableName, extension.to_lower()));
+                    if (file_exists(possiblePath)) return possiblePath;
+                }
+            }
+
+            // If not found, return the same as passed in - it may work, 
+            // but possibly not.
+            return executableName;
+        }
+
+        public string get_current_assembly_path()
+        {
+            return Assembly.GetExecutingAssembly().CodeBase.Replace("file:///", string.Empty);
+        }
+    
         #endregion
 
         #region File
@@ -87,11 +159,11 @@ namespace chocolatey.infrastructure.filesystem
         {
             return Directory.EnumerateFiles(directoryPath, pattern, option);
         }
-        
+
         public IEnumerable<string> get_files(string directoryPath, string[] extensions, SearchOption option = SearchOption.TopDirectoryOnly)
         {
             return Directory.EnumerateFiles(directoryPath, "*.*", option)
-                .Where(f => extensions.Any(x => f.EndsWith(x,StringComparison.OrdinalIgnoreCase)));
+                            .Where(f => extensions.Any(x => f.EndsWith(x, StringComparison.OrdinalIgnoreCase)));
         }
 
         public bool file_exists(string filePath)
@@ -123,7 +195,7 @@ namespace chocolatey.infrastructure.filesystem
             return new FileInfo(filePath);
         }
 
-        public DateTime get_file_modified_date(string filePath)
+        public System.DateTime get_file_modified_date(string filePath)
         {
             return new FileInfo(filePath).LastWriteTime;
         }
@@ -186,11 +258,23 @@ namespace chocolatey.infrastructure.filesystem
 
         public bool copy_file_unsafe(string sourceFilePath, string destinationFilePath, bool overwriteExisting)
         {
+            if (Platform.get_platform() != PlatformType.Windows)
+            {
+                copy_file(sourceFilePath, destinationFilePath, overwriteExisting);
+                return true;
+            }
+
             this.Log().Debug(() => "Attempting to copy from \"{0}\" to \"{1}\".".format_with(sourceFilePath, destinationFilePath));
             create_directory_if_not_exists(get_directory_name(destinationFilePath), ignoreError: true);
+
             //Private Declare Function apiCopyFile Lib "kernel32" Alias "CopyFileA" _
             int success = CopyFileW(sourceFilePath, destinationFilePath, overwriteExisting ? 0 : 1);
-            return success == 0;
+            //if (success == 0)
+            //{
+            //    var error = Marshal.GetLastWin32Error();
+                
+            //}
+            return success != 0;
         }
 
         // ReSharper disable InconsistentNaming
@@ -205,7 +289,7 @@ namespace chocolatey.infrastructure.filesystem
             );
          */
 
-        [DllImport("kernel32")]
+        [DllImport("kernel32", SetLastError = true)]
         private static extern int CopyFileW(string lpExistingFileName, string lpNewFileName, int bFailIfExists);
 
         // ReSharper restore InconsistentNaming
@@ -227,6 +311,11 @@ namespace chocolatey.infrastructure.filesystem
         public string read_file(string filePath)
         {
             return File.ReadAllText(filePath, get_file_encoding(filePath));
+        }
+
+        public byte[] read_file_bytes(string filePath)
+        {
+            return File.ReadAllBytes(filePath);
         }
 
         public FileStream open_file_readonly(string filePath)
@@ -317,6 +406,9 @@ namespace chocolatey.infrastructure.filesystem
 
         public void move_directory(string directoryPath, string newDirectoryPath)
         {
+            if (string.IsNullOrWhiteSpace(directoryPath) || string.IsNullOrWhiteSpace(newDirectoryPath)) throw new ApplicationException("You must provide a directory to move from or to.");
+            if (combine_paths(directoryPath,"").is_equal_to(combine_paths(Environment.GetEnvironmentVariable("SystemDrive"),""))) throw new ApplicationException("Cannot move or delete the root of the system drive");
+
             try
             {
                 this.Log().Debug("Moving '{0}'{1} to '{2}'".format_with(directoryPath, Environment.NewLine, newDirectoryPath));
@@ -385,6 +477,9 @@ namespace chocolatey.infrastructure.filesystem
 
         public void delete_directory(string directoryPath, bool recursive)
         {
+            if (string.IsNullOrWhiteSpace(directoryPath)) throw new ApplicationException("You must provide a directory to delete.");
+            if (combine_paths(directoryPath, "").is_equal_to(combine_paths(Environment.GetEnvironmentVariable("SystemDrive"), ""))) throw new ApplicationException("Cannot move or delete the root of the system drive");
+           
             this.Log().Debug(() => "Attempting to delete directory \"{0}\".".format_with(get_full_path(directoryPath)));
             allow_retries(() => Directory.Delete(directoryPath, recursive));
         }

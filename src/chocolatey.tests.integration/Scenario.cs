@@ -23,15 +23,20 @@ namespace chocolatey.tests.integration
     using chocolatey.infrastructure.app.configuration;
     using chocolatey.infrastructure.app.domain;
     using chocolatey.infrastructure.app.nuget;
+    using chocolatey.infrastructure.app.services;
+    using chocolatey.infrastructure.commands;
     using chocolatey.infrastructure.filesystem;
 
     public class Scenario
     {
+
+        private static IChocolateyPackageService _service;
+
         private static readonly DotNetFileSystem _fileSystem = new DotNetFileSystem();
 
         public static string get_top_level()
         {
-            return _fileSystem.get_directory_name(Assembly.GetExecutingAssembly().CodeBase.Replace("file:///", string.Empty));
+            return _fileSystem.get_directory_name(_fileSystem.get_current_assembly_path());
         }
 
         public static string get_package_install_path()
@@ -63,6 +68,8 @@ namespace chocolatey.tests.integration
             _fileSystem.create_directory(backupPackagesPath);
             _fileSystem.create_directory(_fileSystem.combine_paths(get_top_level(), ".chocolatey"));
             _fileSystem.create_directory(_fileSystem.combine_paths(get_top_level(), "extensions"));
+
+            PowershellExecutor.AllowUseWindow = false;
         }
 
         public static void add_packages_to_source_location(ChocolateyConfiguration config, string pattern)
@@ -79,13 +86,26 @@ namespace chocolatey.tests.integration
 
         public static void install_package(ChocolateyConfiguration config, string packageId, string version)
         {
-            var pattern = "{0}.{1}{2}".format_with(packageId, string.IsNullOrWhiteSpace(version) ? "*" : version, Constants.PackageExtension);
-            var files = _fileSystem.get_files(config.Sources, pattern);
-            foreach (var file in files)
+            if (_service == null)
             {
-                var packageManager = NugetCommon.GetPackageManager(config,new ChocolateyNugetLogger(), null, null, false);
-                packageManager.InstallPackage(new OptimizedZipPackage(file), false,false);
+                _service= NUnitSetup.Container.GetInstance<IChocolateyPackageService>();
             }
+
+            var originalPackageName = config.PackageNames;
+            var originalPackageVersion = config.Version;
+
+            config.PackageNames = packageId;
+            config.Version = version;
+            _service.install_run(config);
+            config.PackageNames = originalPackageName;
+            config.Version = originalPackageVersion;
+            //var pattern = "{0}.{1}{2}".format_with(packageId, string.IsNullOrWhiteSpace(version) ? "*" : version, Constants.PackageExtension);
+            //var files = _fileSystem.get_files(config.Sources, pattern);
+            //foreach (var file in files)
+            //{
+            //    var packageManager = NugetCommon.GetPackageManager(config, new ChocolateyNugetLogger(), null, null, false);
+            //    packageManager.InstallPackage(new OptimizedZipPackage(file), false,false);
+            //}
         }
 
         private static ChocolateyConfiguration baseline_configuration()
@@ -129,6 +149,14 @@ namespace chocolatey.tests.integration
         {
             var config = baseline_configuration();
             config.CommandName = CommandNameType.upgrade.to_string();
+
+            return config;
+        }
+
+        public static ChocolateyConfiguration uninstall()
+        {
+            var config = baseline_configuration();
+            config.CommandName = CommandNameType.uninstall.to_string();
 
             return config;
         }

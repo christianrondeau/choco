@@ -97,12 +97,11 @@ namespace chocolatey.console
                     Environment.Exit(-1);
                 }
 
-                Log4NetAppenderConfiguration.set_verbose_logger_when_verbose(config.Verbose, ChocolateyLoggers.Verbose.to_string());
+                Log4NetAppenderConfiguration.set_verbose_logger_when_verbose(config.Verbose, "{0}LoggingColoredConsoleAppender".format_with(ChocolateyLoggers.Verbose.to_string()));
                 Log4NetAppenderConfiguration.set_logging_level_debug_when_debug(config.Debug);
                 "chocolatey".Log().Debug(() => "{0} is running on {1} v {2}".format_with(ApplicationParameters.Name, config.Information.PlatformType, config.Information.PlatformVersion.to_string()));
                 //"chocolatey".Log().Debug(() => "Command Line: {0}".format_with(Environment.CommandLine));
 
-                warn_when_admin_needs_elevation(config);
                 remove_old_chocolatey_exe(fileSystem);
 
                 LicenseValidation.validate(fileSystem);
@@ -173,42 +172,16 @@ namespace chocolatey.console
             }
         }
 
-        static EventHandler _handler;
-
         private static void trap_exit_scenarios(ChocolateyConfiguration config)
         {
             ExitScenarioHandler.SetHandler();
-        }
-
-        private static void warn_when_admin_needs_elevation(ChocolateyConfiguration config)
-        {
-            // NOTE: blended options may not have been fully initialized yet
-            if (!config.PromptForConfirmation) return;
-
-            if (!config.Information.IsProcessElevated && config.Information.IsUserAdministrator)
-            {
-                var selection = InteractivePrompt.prompt_for_confirmation(@"
-Chocolatey detected you are not running from an elevated command shell
- (cmd/powershell). You may experience errors - many functions/packages
- require admin rights. Only advanced users should run choco w/out an
- elevated shell. When you open the command shell, you should ensure 
- that you do so with ""Run as Administrator"" selected.
-
- Do you want to continue?", new[] {"yes", "no"}, "no", requireAnswer: true);
-
-                if (selection.is_equal_to("no"))
-                {
-                    pause_execution_if_debug();
-                    Environment.Exit(-1);
-                }
-            }
         }
 
         private static void remove_old_chocolatey_exe(IFileSystem fileSystem)
         {
             try
             {
-                fileSystem.delete_file(Assembly.GetExecutingAssembly().CodeBase.Replace("file:///", string.Empty) + ".old");
+                fileSystem.delete_file(fileSystem.get_current_assembly_path() + ".old");
                 fileSystem.delete_file(fileSystem.combine_paths(AppDomain.CurrentDomain.BaseDirectory, "choco.exe.old"));
             }
             catch (Exception ex)

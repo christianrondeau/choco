@@ -18,6 +18,8 @@ namespace chocolatey.infrastructure.app.services
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
+    using commandline;
     using configuration;
     using domain;
     using filesystem;
@@ -30,6 +32,7 @@ namespace chocolatey.infrastructure.app.services
         private readonly IFileSystem _fileSystem;
         private readonly IRegistryService _registryService;
         private readonly ICommandExecutor _commandExecutor;
+        private const int SLEEP_TIME = 2;
 
         public AutomaticUninstallerService(IChocolateyPackageInformationService packageInfoService, IFileSystem fileSystem, IRegistryService registryService, ICommandExecutor commandExecutor)
         {
@@ -37,7 +40,10 @@ namespace chocolatey.infrastructure.app.services
             _fileSystem = fileSystem;
             _registryService = registryService;
             _commandExecutor = commandExecutor;
+            WaitForCleanup = true;
         }
+
+        public bool WaitForCleanup { get; set; }
 
         public void run(PackageResult packageResult, ChocolateyConfiguration config)
         {
@@ -63,82 +69,117 @@ namespace chocolatey.infrastructure.app.services
             }
 
             this.Log().Info(" Running auto uninstaller...");
-
+            if (WaitForCleanup)
+            {
+                this.Log().Debug("Sleeping for {0} seconds to allow Windows to finish cleaning up.".format_with(SLEEP_TIME));
+                Thread.Sleep((int)TimeSpan.FromSeconds(SLEEP_TIME).TotalMilliseconds);
+            }
+            
             foreach (var key in registryKeys.or_empty_list_if_null())
             {
                 this.Log().Debug(() => " Preparing uninstall key '{0}'".format_with(key.UninstallString));
 
-                if (!_fileSystem.directory_exists(key.InstallLocation) || !_registryService.value_exists(key.KeyPath, ApplicationParameters.RegistryValueInstallLocation))
+                if ((!string.IsNullOrWhiteSpace(key.InstallLocation) && !_fileSystem.directory_exists(key.InstallLocation)) || !_registryService.installer_value_exists(key.KeyPath, ApplicationParameters.RegistryValueInstallLocation))
                 {
                     this.Log().Info(" Skipping auto uninstaller - The application appears to have been uninstalled already by other means.");
                     this.Log().Debug(() => " Searched for install path '{0}' - found? {1}".format_with(key.InstallLocation.escape_curly_braces(), _fileSystem.directory_exists(key.InstallLocation)));
-                    this.Log().Debug(() => " Searched for registry key '{0}' value '{1}' - found? {2}".format_with(key.KeyPath.escape_curly_braces(), ApplicationParameters.RegistryValueInstallLocation, _registryService.value_exists(key.KeyPath, ApplicationParameters.RegistryValueInstallLocation)));
+                    this.Log().Debug(() => " Searched for registry key '{0}' value '{1}' - found? {2}".format_with(key.KeyPath.escape_curly_braces(), ApplicationParameters.RegistryValueInstallLocation, _registryService.installer_value_exists(key.KeyPath, ApplicationParameters.RegistryValueInstallLocation)));
                     continue;
                 }
 
                 // split on " /" and " -" for quite a bit more accuracy
-                IList<string> uninstallArgs = key.UninstallString.to_string().Split(new[] {" /", " -"}, StringSplitOptions.RemoveEmptyEntries).ToList();
-                var uninstallExe = uninstallArgs.DefaultIfEmpty(string.Empty).FirstOrDefault();
-                uninstallArgs.Remove(uninstallExe);
+                IList<string> uninstallArgsSplit = key.UninstallString.to_string().Split(new[] {" /", " -"}, StringSplitOptions.RemoveEmptyEntries).ToList();
+                var uninstallExe = uninstallArgsSplit.DefaultIfEmpty(string.Empty).FirstOrDefault();
+                var uninstallArgs = key.UninstallString.to_string().Replace(uninstallExe.to_string(), string.Empty);
                 uninstallExe = uninstallExe.remove_surrounding_quotes();
                 this.Log().Debug(() => " Uninstaller path is '{0}'".format_with(uninstallExe));
 
-                //todo: ultimately we should merge keys with logging
-                if (!key.HasQuietUninstall)
+
+                IInstaller installer = new CustomInstaller();
+
+                switch (key.InstallerType)
                 {
-                    IInstaller installer = new CustomInstaller();
-
-                    switch (key.InstallerType)
-                    {
-                        case InstallerType.Msi:
-                            installer = new MsiInstaller();
-                            break;
-                        case InstallerType.InnoSetup:
-                            installer = new InnoSetupInstaller();
-                            break;
-                        case InstallerType.Nsis:
-                            installer = new NsisInstaller();
-                            break;
-                        case InstallerType.InstallShield:
-                            installer = new CustomInstaller();
-                            break;
-                        default:
-                            // skip
-                            break;
-                    }
-
-                    this.Log().Debug(() => " Installer type is '{0}'".format_with(installer.GetType().Name));
-
-                    uninstallArgs.Add(installer.build_uninstall_command_arguments());
+                    case InstallerType.Msi:
+                        installer = new MsiInstaller();
+                        break;
+                    case InstallerType.InnoSetup:
+                        installer = new InnoSetupInstaller();
+                        break;
+                    case InstallerType.Nsis:
+                        installer = new NsisInstaller();
+                        break;
+                    case InstallerType.InstallShield:
+                        installer = new InstallShieldInstaller();
+                        break;
                 }
 
-                this.Log().Debug(() => " Args are '{0}'".format_with(uninstallArgs.@join(" ")));
+                this.Log().Debug(() => " Installer type is '{0}'".format_with(installer.GetType().Name));
+
+                if (key.InstallerType == InstallerType.Msi)
+                {
+                    // because sometimes the key is set with /i to allow for modify :/
+                    uninstallArgs = uninstallArgs.Replace("/I{", "/X{");
+                    uninstallArgs = uninstallArgs.Replace("/i{", "/X{");
+                    uninstallArgs = uninstallArgs.Replace("/I ", "/X ");
+                    uninstallArgs = uninstallArgs.Replace("/i ", "/X ");
+                }
+
+                if (!key.HasQuietUninstall)
+                {
+                    //todo: ultimately we should merge keys
+                    uninstallArgs += " " + installer.build_uninstall_command_arguments();
+                }
+
+                var logLocation = _fileSystem.combine_paths(_fileSystem.get_full_path(config.CacheLocation), "chocolatey", pkgInfo.Package.Id, pkgInfo.Package.Version.to_string());
+                this.Log().Debug(()=>" Setting up uninstall logging directory at {0}".format_with(logLocation));
+                _fileSystem.create_directory_if_not_exists(_fileSystem.get_directory_name(logLocation));
+                uninstallArgs = uninstallArgs.Replace(InstallTokens.PACKAGE_LOCATION, logLocation);
+
+                this.Log().Debug(() => " Args are '{0}'".format_with(uninstallArgs));
+
+                if (!key.HasQuietUninstall &&  installer.GetType() == typeof(CustomInstaller))
+                {
+                    var skipUninstaller = true;
+                    if (config.PromptForConfirmation)
+                    {
+                        var selection = InteractivePrompt.prompt_for_confirmation("Uninstall may not be silent (could not detect). Proceed?", new[] {"yes", "no"}, defaultChoice: null, requireAnswer: true);
+                        if (selection.is_equal_to("yes")) skipUninstaller = false;
+                    }
+
+                    if (skipUninstaller)
+                    {
+                        this.Log().Info(" Skipping auto uninstaller - Installer type was not detected and no silent uninstall key exists.");
+                        this.Log().Warn("If the application was not removed with a chocolateyUninstall.ps1,{0} please remove it from Programs and Features manually.".format_with(Environment.NewLine));
+                        return;
+                    }
+                }
 
                 var exitCode = _commandExecutor.execute(
-                    uninstallExe, 
-                    uninstallArgs.@join(" "), 
+                    uninstallExe,
+                    uninstallArgs.trim_safe(),
                     config.CommandExecutionTimeoutSeconds,
                     (s, e) =>
                         {
                             if (e == null || string.IsNullOrWhiteSpace(e.Data)) return;
-                            this.Log().Debug(() => " [AutoUninstaller] {0}".format_with(e.Data));
+                            this.Log().Info(() => " [AutoUninstaller] {0}".format_with(e.Data));
                         },
                     (s, e) =>
                         {
                             if (e == null || string.IsNullOrWhiteSpace(e.Data)) return;
                             this.Log().Error(() => " [AutoUninstaller] {0}".format_with(e.Data));
-                        });
+                        },
+                    updateProcessPath: false);
 
-                if (exitCode != 0)
+                if (!installer.ValidUninstallExitCodes.Contains(exitCode))
                 {
                     Environment.ExitCode = exitCode;
-                    string logMessage = " Auto uninstaller failed. Please remove machine installation manually.";
+                    string logMessage = " Auto uninstaller failed. Please remove machine installation manually.{0} Exit code was {1}".format_with(Environment.NewLine, exitCode);
                     this.Log().Error(() => logMessage);
-                    packageResult.Messages.Add(new ResultMessage(ResultType.Error, logMessage));
+                    packageResult.Messages.Add(new ResultMessage(config.Features.FailOnAutoUninstaller ? ResultType.Error : ResultType.Warn, logMessage));
                 }
                 else
                 {
-                    this.Log().Info(() => " Auto uninstaller has successfully uninstalled {0} from your machine.".format_with(packageResult.Package.Id));
+                    this.Log().Info(() => " Auto uninstaller has successfully uninstalled {0} or detected previous uninstall.".format_with(packageResult.Package.Id));
                 }
             }
         }

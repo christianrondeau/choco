@@ -33,12 +33,14 @@ namespace chocolatey.infrastructure.app.configuration
         {
             RegularOutput = true;
             PromptForConfirmation = true;
+            SourceType = SourceType.normal;
             Information = new InformationCommandConfiguration();
             Features = new FeaturesConfiguration();
             NewCommand = new NewCommandConfiguration();
             ListCommand = new ListCommandConfiguration();
             UpgradeCommand = new UpgradeCommandConfiguration();
             SourceCommand = new SourcesCommandConfiguration();
+            MachineSources = new List<MachineSourceConfiguration>();
             FeatureCommand = new FeatureCommandConfiguration();
             ApiKeyCommand = new ApiKeyCommandConfiguration();
             PushCommand = new PushCommandConfiguration();
@@ -67,7 +69,7 @@ NOTE: Hiding sensitive configuration data! Please double and triple
             foreach (var propertyInfo in properties.or_empty_list_if_null())
             {
                 // skip sensitive data info
-                if (propertyInfo.Name == "Password" || propertyInfo.Name == "Key")
+                if (propertyInfo.Name == "Password" || propertyInfo.Name == "Key" || propertyInfo.Name == "MachineSources")
                 {
                     continue;
                 }
@@ -142,6 +144,7 @@ NOTE: Hiding sensitive configuration data! Please double and triple
         ///   One or more source locations set by configuration or by command line. Separated by semi-colon
         /// </summary>
         public string Sources { get; set; }
+        public SourceType SourceType { get; set; }
 
         // top level commands
 
@@ -150,7 +153,22 @@ NOTE: Hiding sensitive configuration data! Please double and triple
         public bool Force { get; set; }
         public bool Noop { get; set; }
         public bool HelpRequested { get; set; }
+
+        // TODO: Should look into using mutually exclusive output levels - Debug, Info (Regular), Error (Quiet)
+        // Verbose and Important are not part of the levels at all
+        /// <summary>
+        /// Gets or sets a value indicating whether output should be limited.
+        /// This supports the --limit-output parameter.
+        /// </summary>
+        /// <value><c>true</c> for regular output; <c>false</c> for limited output.</value>
         public bool RegularOutput { get; set; }
+        /// <summary>
+        /// Gets or sets a value indicating whether console logging should be supressed. 
+        /// This is for use by API calls which surface results in alternate forms.
+        /// </summary>
+        /// <value><c>true</c> for no output; <c>false</c> for regular or limited output.</value>
+        /// <remarks>This has only been implemented for NuGet List</remarks>
+        public bool QuietOutput { get; set; }
         public bool PromptForConfirmation { get; set; }
         public bool AcceptLicense { get; set; }
         public bool AllowUnofficialBuild { get; set; }
@@ -231,7 +249,15 @@ NOTE: Hiding sensitive configuration data! Please double and triple
         /// <remarks>
         ///   On .NET 4.0, get error CS0200 when private set - see http://stackoverflow.com/a/23809226/18475
         /// </remarks>
-        public SourcesCommandConfiguration SourceCommand { get;  set; }
+        public SourcesCommandConfiguration SourceCommand { get;  set; }        
+        
+        /// <summary>
+        ///   Default Machine Sources Configuration
+        /// </summary>
+        /// <remarks>
+        ///   On .NET 4.0, get error CS0200 when private set - see http://stackoverflow.com/a/23809226/18475
+        /// </remarks>
+        public IList<MachineSourceConfiguration> MachineSources { get; set; }
 
         /// <summary>
         /// Configuration related specifically to the Feature command
@@ -288,6 +314,7 @@ NOTE: Hiding sensitive configuration data! Please double and triple
     {
         public bool AutoUninstaller { get; set; }
         public bool CheckSumFiles { get; set; }
+        public bool FailOnAutoUninstaller { get; set; }
     }
 
     //todo: retrofit other command configs this way
@@ -304,6 +331,8 @@ NOTE: Hiding sensitive configuration data! Please double and triple
     public sealed class UpgradeCommandConfiguration
     {
         public bool FailOnUnfound { get; set; }
+        public bool FailOnNotInstalled { get; set; }
+        public bool NotifyOnlyAvailableUpgrades { get; set; }
     }
 
     [Serializable]
@@ -326,6 +355,15 @@ NOTE: Hiding sensitive configuration data! Please double and triple
         public SourceCommandType Command { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
+    }
+
+    [Serializable]
+    public sealed class MachineSourceConfiguration
+    {
+        public string Name { get; set; }
+        public string Key { get; set; }
+        public string Username { get; set; }
+        public string EncryptedPassword { get; set; }
     }
 
     [Serializable]

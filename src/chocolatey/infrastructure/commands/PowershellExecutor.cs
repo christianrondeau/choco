@@ -17,6 +17,7 @@ namespace chocolatey.infrastructure.commands
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Diagnostics;
     using System.IO;
     using adapters;
@@ -25,10 +26,19 @@ namespace chocolatey.infrastructure.commands
 
     public sealed class PowershellExecutor
     {
+        private static bool _allowUseWindow = true;
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static bool AllowUseWindow
+        {
+            get { return _allowUseWindow; }
+            set { _allowUseWindow = value; }
+        }
+
         private static readonly IList<string> _powershellLocations = new List<string>
             {
-                Environment.ExpandEnvironmentVariables("%windir%\\SysNative\\WindowsPowerShell\\v1.0\\powershell.exe"),
-                Environment.ExpandEnvironmentVariables("%windir%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
+                Environment.ExpandEnvironmentVariables("%systemroot%\\SysNative\\WindowsPowerShell\\v1.0\\powershell.exe"),
+                Environment.ExpandEnvironmentVariables("%systemroot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
                 "powershell.exe"
             };
 
@@ -46,14 +56,15 @@ namespace chocolatey.infrastructure.commands
             //-NoProfile -NoLogo -ExecutionPolicy unrestricted -Command "[System.Threading.Thread]::CurrentThread.CurrentCulture = ''; [System.Threading.Thread]::CurrentThread.CurrentUICulture = '';& '%DIR%chocolatey.ps1' %PS_ARGS%"
             string arguments = "-NoProfile -NoLogo -ExecutionPolicy Bypass -Command \"{0}\"".format_with(command);
 
-            return CommandExecutor.execute(
+            return CommandExecutor.execute_static(
                 _powershell,
                 arguments,
                 waitForExitSeconds,
-                workingDirectory: fileSystem.get_directory_name(Assembly.GetExecutingAssembly().CodeBase.Replace("file:///", string.Empty)),
+                workingDirectory: fileSystem.get_directory_name(fileSystem.get_current_assembly_path()),
                 stdOutAction: stdOutAction,
                 stdErrAction: stdErrAction,
-                updateProcessPath: true
+                updateProcessPath: true,
+                allowUseWindow: _allowUseWindow
                 );
         }
 

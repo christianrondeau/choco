@@ -1,6 +1,6 @@
 ## Chocolatey Usage Scenarios
 
-### ChocolateyInstallCommand [ 28 Scenario(s), 229 Observation(s) ]
+### ChocolateyInstallCommand [ 30 Scenario(s), 254 Observation(s) ]
 
 #### when force installing a package that depends on an unavailable newer version of an installed dependency forcing dependencies
 
@@ -111,6 +111,25 @@
  * should have inconclusive package result
  * should still have the package installed with the expected version of the package
 
+#### when installing a package from a nupkg file
+
+ * config should match package result name
+ * should contain a warning message that it installed successfully
+ * should create a shim for console in the bin directory
+ * should create a shim for graphical in the bin directory
+ * should have a console shim that is set for non gui access
+ * should have a graphical shim that is set for gui access
+ * should have a successful package result
+ * should have a version of one dot zero dot zero
+ * should install the expected version of the package
+ * should install the package in the lib directory
+ * should install where install location reports
+ * should not create a shim for ignored executable in the bin directory
+ * should not create a shim for mismatched case ignored executable in the bin directory
+ * should not create an extensions folder for the package
+ * should not have inconclusive package result
+ * should not have warning package result
+
 #### when installing a package happy path
 
  * config should match package result name
@@ -126,7 +145,7 @@
  * should install where install location reports
  * should not create a shim for ignored executable in the bin directory
  * should not create a shim for mismatched case ignored executable in the bin directory
- * should not create an extensions folder for the pacakge
+ * should not create an extensions folder for the package
  * should not have inconclusive package result
  * should not have warning package result
 
@@ -203,6 +222,18 @@
  * should not have inconclusive package result
  * should not have warning package result
  * should not install a package in the lib directory
+
+#### when installing a package with config transforms
+
+ * should add the insert value in the config due to XDT InsertIfMissing
+ * should change the testReplace value in the config due to XDT Replace
+ * should contain a warning message that it installed successfully
+ * should have a successful package result
+ * should have a version of one dot zero dot zero
+ * should install the expected version of the package
+ * should not change the test value in the config due to XDT InsertIfMissing
+ * should not have inconclusive package result
+ * should not have warning package result
 
 #### when installing a package with dependencies and dependency cannot be found
 
@@ -315,7 +346,7 @@
  * should not have inconclusive package result
  * should not have warning package result
 
-### ChocolateyUninstallCommand [ 12 Scenario(s), 82 Observation(s) ]
+### ChocolateyUninstallCommand [ 12 Scenario(s), 84 Observation(s) ]
 
 #### when force uninstalling a package
 
@@ -359,6 +390,7 @@
  * should contain a warning message that it uninstalled successfully
  * should delete a shim for console in the bin directory
  * should delete a shim for graphical in the bin directory
+ * should delete any files created during the install
  * should delete the rollback
  * should have a successful package result
  * should not have inconclusive package result
@@ -384,7 +416,8 @@
  * should not have inconclusive package result
  * should not have warning package result
  * should not put the package in the lib bad directory
- * should remove package from the lib directory
+ * should not remove package from the lib directory
+ * should still have the package file in the directory
 
 #### when uninstalling a package with a read and delete share locked file
 
@@ -435,7 +468,7 @@
 
  * should throw an error that it is not allowed
 
-### ChocolateyUpgradeCommand [ 21 Scenario(s), 167 Observation(s) ]
+### ChocolateyUpgradeCommand [ 25 Scenario(s), 204 Observation(s) ]
 
 #### when force upgrading a package
 
@@ -539,9 +572,11 @@
  * should contain a message that no packages were upgraded
  * should contain a message the package was not found
  * should have an error package result
+ * should have expected error in package result
  * should not have a successful package result
  * should not have inconclusive package result
  * should not have warning package result
+ * should not install a package in the lib directory
 
 #### when upgrading a package that does not have available upgrades
 
@@ -557,7 +592,7 @@
 
 #### when upgrading a package that errors
 
- * should contain a warning message that it was unable to install a package
+ * should contain a warning message that it was unable to upgrade a package
  * should delete the rollback
  * should have an error package result
  * should have expected error in package result
@@ -568,6 +603,26 @@
  * should not remove package from the lib directory
  * should not upgrade the package
  * should put the package in the lib bad directory
+
+#### when upgrading a package that is not installed
+
+ * should contain a warning message that it upgraded successfully
+ * should have a successful package result
+ * should install a package in the lib directory
+ * should install where install location reports
+ * should not have a rollback directory
+ * should not have inconclusive package result
+ * should not have warning package result
+
+#### when upgrading a package that is not installed and failing on not installed
+
+ * should contain a warning message that it was unable to upgrade a package
+ * should have an error package result
+ * should have expected error in package result
+ * should not have a successful package result
+ * should not have inconclusive package result
+ * should not have warning package result
+ * should not install a package in the lib directory
 
 #### when upgrading a package with a read and delete share locked file
 
@@ -614,6 +669,33 @@
  * should not have inconclusive package result
  * should not have warning package result
  * should update the changed file
+ * should upgrade the package
+
+#### when upgrading a package with config transforms
+
+ * should add the insertNew value in the config due to XDT InsertIfMissing
+ * should change the testReplace value in the config due to XDT Replace
+ * should contain a warning message that it upgraded successfully
+ * should have a successful package result
+ * should match the upgrade version of one dot one dot zero
+ * should not change the insert value in the config due to upgrade and XDT InsertIfMissing
+ * should not change the test value in the config from original one dot zero dot zero due to upgrade and XDT InsertIfMissing
+ * should not have inconclusive package result
+ * should not have warning package result
+ * should upgrade the package
+
+#### when upgrading a package with config transforms when config was edited
+
+ * should add the insertNew value in the config due to XDT InsertIfMissing
+ * should change the testReplace value in the config due to XDT Replace
+ * should contain a warning message that it upgraded successfully
+ * should have a config with the comment from the original
+ * should have a successful package result
+ * should match the upgrade version of one dot one dot zero
+ * should not change the insert value in the config due to upgrade and XDT InsertIfMissing
+ * should not change the test value in the config from original one dot zero dot zero due to upgrade and XDT InsertIfMissing
+ * should not have inconclusive package result
+ * should not have warning package result
  * should upgrade the package
 
 #### when upgrading a package with dependencies happy

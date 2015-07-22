@@ -16,6 +16,7 @@
 namespace chocolatey.infrastructure.app.services
 {
     using System.Collections.Concurrent;
+    using System.Collections.Generic;
     using configuration;
     using results;
 
@@ -24,6 +25,13 @@ namespace chocolatey.infrastructure.app.services
     /// </summary>
     public interface IChocolateyPackageService
     {
+
+        /// <summary>
+        ///   Ensures the application that controls a source is installed
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        void ensure_source_app_installed(ChocolateyConfiguration config);
+
         /// <summary>
         ///   Run list in noop mode
         /// </summary>
@@ -34,9 +42,8 @@ namespace chocolatey.infrastructure.app.services
         ///   Lists/searches for packages that meet a search criteria
         /// </summary>
         /// <param name="config">The configuration.</param>
-        /// <param name="logResults">Should results be logged?</param>
         /// <returns></returns>
-        void list_run(ChocolateyConfiguration config, bool logResults);
+        IEnumerable<PackageResult> list_run(ChocolateyConfiguration config);
 
         /// <summary>
         ///   Run pack in noop mode
@@ -74,6 +81,18 @@ namespace chocolatey.infrastructure.app.services
         /// <param name="config">The configuration.</param>
         /// <returns>results of installs</returns>
         ConcurrentDictionary<string, PackageResult> install_run(ChocolateyConfiguration config);
+
+        /// <summary>
+        ///  Run outdated in noop mode
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        void outdated_noop(ChocolateyConfiguration config);
+
+        /// <summary>
+        /// Determines all packages that are out of date
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        void outdated_run(ChocolateyConfiguration config);
 
         /// <summary>
         ///   Run upgrade in noop mode

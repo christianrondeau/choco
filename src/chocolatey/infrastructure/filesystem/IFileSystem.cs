@@ -53,6 +53,20 @@ namespace chocolatey.infrastructure.filesystem
         /// <returns></returns>
         char get_path_directory_separator_char();
 
+        /// <summary>
+        /// Gets the path to an executable based on looking in current directory, next to the running process, then among the derivatives of Path and Pathext variables
+        /// </summary>
+        /// <param name="executableName">Name of the executable.</param>
+        /// <remarks>Based loosely on http://stackoverflow.com/a/5471032/18475</remarks>
+        /// <returns></returns>
+        string get_executable_path(string executableName);
+
+        /// <summary>
+        /// Gets the location of the executing assembly
+        /// </summary>
+        /// <returns>The path to the executing assembly</returns>
+        string get_current_assembly_path();
+
         #endregion
 
         #region File
@@ -197,6 +211,13 @@ namespace chocolatey.infrastructure.filesystem
         string read_file(string filePath);
 
         /// <summary>
+        /// Returns the contents of a file as bytes.
+        /// </summary>
+        /// <param name="filePath">The filepath.</param>
+        /// <returns>A byte array of the file contents</returns>
+        byte[] read_file_bytes(string filePath);
+
+        /// <summary>
         ///   Opens a file
         /// </summary>
         /// <param name="filePath">Path to the file name</param>
@@ -232,7 +253,7 @@ namespace chocolatey.infrastructure.filesystem
         /// <summary>
         ///   Gets the current working directory of the application.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The path to the directory</returns>
         string get_current_directory();
 
         /// <summary>
@@ -330,5 +351,6 @@ namespace chocolatey.infrastructure.filesystem
         /// <param name="path">The path.</param>
         /// <param name="attributes">The attributes.</param>
         void ensure_file_attribute_set(string path, FileAttributes attributes);
+
     }
 }

@@ -73,9 +73,18 @@ namespace chocolatey.infrastructure.app.commands
                 .Add("n|skippowershell|skip-powershell",
                      "Skip Powershell - Do not run chocolateyInstall.ps1. Defaults to false.",
                      option => configuration.SkipPackageInstallProvider = option != null)
-                 .Add("failonunfound|fail-on-unfound",
+                .Add("failonunfound|fail-on-unfound",
                      "Fail On Unfound Packages - If a package is not found in feeds specified, fail instead of warn.",
                      option => configuration.UpgradeCommand.FailOnUnfound = option != null)
+                .Add("failonnotinstalled|fail-on-not-installed",
+                     "Fail On Non-installed Packages - If a package is not already intalled, fail instead of installing.",
+                     option => configuration.UpgradeCommand.FailOnNotInstalled = option != null)
+                .Add("u=|user=",
+                     "User - used with authenticated feeds. Defaults to empty.",
+                     option => configuration.SourceCommand.Username = option.remove_surrounding_quotes())
+                .Add("p=|password=",
+                     "Password - the user's password to the source. Defaults to empty.",
+                     option => configuration.SourceCommand.Password = option.remove_surrounding_quotes())
                 ;
         }
 
@@ -108,8 +117,6 @@ Upgrades a package or a list of packages. Some may prefer to use `cup`
 
 NOTE: `all` is a special package keyword that will allow you to upgrade 
  all currently installed packages.
-
-NOTE: If you do not have a package installed, upgrade will error.
 ");
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, "Examples");
@@ -119,6 +126,8 @@ NOTE: If you do not have a package installed, upgrade will error.
     choco upgrade notepadplusplus googlechrome atom 7zip -dvfy
     choco upgrade git --params=""/GitAndUnixToolsOnPath /NoAutoCrlf"" -y
     choco upgrade nodejs.install --version 0.10.35
+    choco upgrade git -s ""https://somewhere/out/there""
+    choco upgrade git -s ""https://somewhere/protected"" -u user -p pass
 ");
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, "Options and Switches");
@@ -138,7 +147,13 @@ NOTE: Options and switches apply to all items passed, so if you are
 
         public virtual void run(ChocolateyConfiguration configuration)
         {
+            _packageService.ensure_source_app_installed(configuration);
             _packageService.upgrade_run(configuration);
+        }
+
+        public bool may_require_admin_access()
+        {
+            return true;
         }
     }
 }

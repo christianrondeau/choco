@@ -74,6 +74,12 @@ namespace chocolatey.infrastructure.app.commands
                 .Add("n|skippowershell|skip-powershell",
                      "Skip Powershell - Do not run chocolateyInstall.ps1. Defaults to false.",
                      option => configuration.SkipPackageInstallProvider = option != null)
+                .Add("u=|user=",
+                     "User - used with authenticated feeds. Defaults to empty.",
+                     option => configuration.SourceCommand.Username = option.remove_surrounding_quotes())
+                .Add("p=|password=",
+                     "Password - the user's password to the source. Defaults to empty.",
+                     option => configuration.SourceCommand.Password = option.remove_surrounding_quotes())
                 ;
 
             //todo: Checksum / ChecksumType defaults to md5 / package name can be a url / installertype
@@ -91,6 +97,13 @@ namespace chocolatey.infrastructure.app.commands
             {
                 throw new ApplicationException("Package name is required. Please pass at least one package name to install.");
             }
+            // Need a better check on this before releasing. Issue will be covered by other fixes
+            //// investigate https://msdn.microsoft.com/en-us/library/system.io.path.getinvalidpathchars(v=vs.100).aspx
+            //if (configuration.PackageNames.Contains(":"))
+            //{
+            //    throw new ApplicationException("Package name cannot contain invalid characters.");
+            //}
+
             if (configuration.ForceDependencies && !configuration.Force)
             {
                 throw new ApplicationException("Force dependencies can only be used with force also turned on.");
@@ -126,6 +139,8 @@ NOTE: For packages.config, please see https://bit.ly/packages_config
     choco install notepadplusplus googlechrome atom 7zip -dvfy
     choco install git --params=""/GitAndUnixToolsOnPath /NoAutoCrlf"" -y
     choco install nodejs.install --version 0.10.35
+    choco install git -s ""https://somewhere/out/there""
+    choco install git -s ""https://somewhere/protected"" -u user -p pass
 
 Choco can also install directly from a nuspec/nupkg file. This aids in 
  testing packages.
@@ -163,7 +178,13 @@ NOTE: Options and switches apply to all items passed, so if you are
 
         public void run(ChocolateyConfiguration configuration)
         {
+            _packageService.ensure_source_app_installed(configuration);
             _packageService.install_run(configuration);
+        }
+
+        public bool may_require_admin_access()
+        {
+            return true;
         }
     }
 }
